@@ -1,9 +1,10 @@
 #! /usr/bin/python3 env
 # shutdown VLC and/or restart updated
+import subprocess
 from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
 from socketserver import StreamRequestHandler, TCPServer
 from functools import partial
-from subprocess import run
+from subprocess import Popen, PIPE
 
 
 
@@ -64,8 +65,12 @@ def send_cmd(command):
                 print(f'VLC replied:\n{reply.decode('ascii')}')
                 return True
     return
+
 def restart_vlc():
     pass
+    # Remote restart
+    #p = subprocess.Popen('ssh rm@raspberrypi.local', 'tt','rm@raspberrypi.local')
+
 
 if __name__ == '__main__':
     serv = TCPServer(('localhost', 55550), IncomingHandler)
