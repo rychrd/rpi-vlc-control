@@ -4,7 +4,7 @@ import subprocess
 from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
 from socketserver import StreamRequestHandler, TCPServer
 from functools import partial
-from subprocess import Popen, PIPE
+from subprocess import Popen, run, PIPE
 
 
 
@@ -67,9 +67,7 @@ def send_cmd(command):
     return
 
 def restart_vlc():
-    pass
-    # Remote restart
-    #p = subprocess.Popen('ssh rm@raspberrypi.local', 'tt','rm@raspberrypi.local')
+    subprocess.run('cvlc --intf rc --rc-host 0.0.0.0:54322 --extraintf http --http-password xxxx --start-paused pList.m3u')
 
 
 if __name__ == '__main__':
