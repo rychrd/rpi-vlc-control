@@ -1,16 +1,16 @@
-#! /usr/bin/python3 env
+#! /usr/bin/python3
 # shutdown VLC and/or restart updated
 import subprocess
 from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
 from socketserver import StreamRequestHandler, TCPServer
 from functools import partial
-from subprocess import Popen, run, PIPE
+from subprocess import run
 
 
 
-HOST = '192.168.0.198'
+HOST = 'localhost'
 PORT = 54322
-cmds = {b'shutdown\r\n', b'restart\r\n', b'playlist\n'}
+cmds = {b'shutdown\r\n', b'restart\r\n', b'playlist\r\n'}
 
 class Connection:
     def __init__(self, addr_prt, timeout=2, family=AF_INET, transport=SOCK_STREAM):
@@ -46,8 +46,11 @@ class IncomingHandler(StreamRequestHandler):
         print(f'Got inbound connection from {self.client_address}')
         for line in self.rfile:
             print(f'received message {line}')
-            if line in cmds:
-                send_cmd(line)
+            if line in cmds and line != b'restart\r\n':
+               send_cmd(line)
+            elif line == b'restart\r\n':
+                    restart_vlc()
+
 
 def send_cmd(command):
     conn = Connection((HOST, PORT))
@@ -62,21 +65,24 @@ def send_cmd(command):
                 print(f'VLC is listening - sending {command}\n')
                 s.send(command)
                 reply = b''.join(iter(partial(s.recv, 8), b''))
-                print(f'VLC replied:\n{reply.decode('ascii')}')
+                print(f'VLC replied:\n{reply.decode("ascii")}')
                 return True
     return
 
 def restart_vlc():
-    subprocess.run('cvlc --intf rc --rc-host 0.0.0.0:54322 --extraintf http --http-password xxxx --start-paused pList.m3u')
-
+    # subprocess.run(["cvlc --daemon --started-from-file --one-instance-when-started-from-file --no-playlist-enqueue --ignore-filetypes m3u --intf rc --rc-host 0.0.0.0:54322 --extraintf http --http-password xxxx --play-and-pause --start-paused /home/rm/content/pList.m3u & disown"], shell=True)
+    subprocess.run(['systemctl', '--user', 'restart', 'vlc-loader.service'])
 
 if __name__ == '__main__':
-    serv = TCPServer(('localhost', 55550), IncomingHandler)
+    serv = TCPServer(('0.0.0.0', 55550), IncomingHandler)
     serv.allow_reuse_address = 1
-
-    while True:
-        try:
+    print(f'TCP server created')
+#    while True:
+#        try:
+    with serv:
             serv.serve_forever()
-        except OSError as e:
-            print(f'Exception in server loop {e}')
+#        except OSError as e:
+#            print(f'Exception in server loop {e}')
 
+#        finally:
+#            pass
