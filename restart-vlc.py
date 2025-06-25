@@ -1,16 +1,19 @@
 #! /usr/bin/python3
-# shutdown VLC and/or restart updated
-import subprocess
-from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
+# forwards various commands to VLC. Performs a shutdown or reboot of the Pi.
+# Forwarding shutdown to VLC (port 54322) will just shutdown the player.
+
+from socket import socket, gethostbyname, gethostname, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
 from socketserver import StreamRequestHandler, TCPServer
 from functools import partial
 from subprocess import run
 
+VLC_HOST = gethostbyname(gethostname())
+VLC_PORT = 54322
 
+print(f'vlc ip: {VLC_HOST}\n')
 
-HOST = 'localhost'
-PORT = 54322
-cmds = {b'shutdown\r\n', b'restart\r\n', b'playlist\r\n'}
+vlc_cmds = [b'shutdown\r\n', b'playlist\r\n', b'play\r\n', b'frame\r\n']
+rpi_cmds = [b'restart\n', b'pi_shutdown\n', b'pi_reboot\n']
 
 class Connection:
     def __init__(self, addr_prt, timeout=2, family=AF_INET, transport=SOCK_STREAM):
@@ -31,7 +34,7 @@ class Connection:
             self.sock.connect(self.address)
         except ConnectionError as err:
             print(f'Socket was created but error connecting -  {err}')
-            return False
+
         return self.sock
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -44,45 +47,59 @@ class Connection:
 class IncomingHandler(StreamRequestHandler):
     def handle(self):
         print(f'Got inbound connection from {self.client_address}')
+
         for line in self.rfile:
             print(f'received message {line}')
-            if line in cmds and line != b'restart\r\n':
+
+            if line in vlc_cmds:
                send_cmd(line)
-            elif line == b'restart\r\n':
-                    restart_vlc()
+
+            elif line in rpi_cmds:
+                match line:
+                    case b'restart\n':
+                        restart_vlc()
+                    case b'pi_shutdown\n':
+                        shutdown_PI()
+                    case b'pi_reboot\n':
+                        reboot_PI()
+            else:
+                 continue
 
 
 def send_cmd(command):
-    conn = Connection((HOST, PORT))
+    conn = Connection((VLC_HOST, VLC_PORT))
     with conn as s:
         if s is False:
             raise ConnectionError
         else:
-            reply = s.recv(64)# b''.join(iter(partial(s.recv, 8), b''))
-            print(f'reply from initial request:\n{reply}')
+            reply=b''.join(iter(partial(s.recv, 16), b'\n'))
+            print(f'connected:\n{reply}')
 
             if reply.startswith(b'VLC'):
-                print(f'VLC is listening - sending {command}\n')
-                s.send(command)
-                reply = b''.join(iter(partial(s.recv, 8), b''))
+                print(f'----- VLC is running -----')
+                reply= b''.join(iter(partial(s.recv, 1), b'>'))
+                print(f'{reply}')
+                s.sendall(command)
+                reply = b''.join(iter(partial(s.recv,1), b'>'))
                 print(f'VLC replied:\n{reply.decode("ascii")}')
-                return True
-    return
+
 
 def restart_vlc():
     # subprocess.run(["cvlc --daemon --started-from-file --one-instance-when-started-from-file --no-playlist-enqueue --ignore-filetypes m3u --intf rc --rc-host 0.0.0.0:54322 --extraintf http --http-password xxxx --play-and-pause --start-paused /home/rm/content/pList.m3u & disown"], shell=True)
-    subprocess.run(['systemctl', '--user', 'restart', 'vlc-loader.service'])
+    run(['systemctl', '--user', 'restart', 'vlc-loader.service'])
+
+def shutdown_PI():
+    run(['sudo', 'shutdown', '-h', 'now'])
+
+def reboot_PI():
+    run(['sudo', 'shutdown', '-r', 'now'])
+
 
 if __name__ == '__main__':
+
     serv = TCPServer(('0.0.0.0', 55550), IncomingHandler)
     serv.allow_reuse_address = 1
     print(f'TCP server created')
-#    while True:
-#        try:
+
     with serv:
             serv.serve_forever()
-#        except OSError as e:
-#            print(f'Exception in server loop {e}')
-
-#        finally:
-#            pass
