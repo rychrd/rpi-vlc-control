@@ -1,6 +1,6 @@
 #! /usr/bin/python3
 # forwards various commands to VLC. Performs a shutdown or reboot of the Pi.
-# Forwarding shutdown to VLC (port 54322) will just shutdown the player.
+# Forwarding shutdown to VLC (port 54322) will just shut down the player.
 
 from socket import socket, gethostbyname, gethostname, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
 from socketserver import StreamRequestHandler, TCPServer
@@ -10,7 +10,7 @@ from subprocess import run
 VLC_HOST = gethostbyname(gethostname())
 VLC_PORT = 54322
 
-print(f'vlc ip: {VLC_HOST}\n')
+print(f'VLC ip: {VLC_HOST}\n')
 
 vlc_cmds = [b'shutdown\r\n', b'playlist\r\n', b'play\r\n', b'frame\r\n']
 rpi_cmds = [b'restart\n', b'pi_shutdown\n', b'pi_reboot\n']
