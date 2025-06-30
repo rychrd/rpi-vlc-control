@@ -1,9 +1,8 @@
 #! /usr/bin/python3
-# Listens for TCP connections on prt 55550 forwards commands to VLCs lua rc interface on 54322
-# Can shut down or reboot the Pi.
-# Restarts VLC with systemd
+# forwards various commands to VLC. Performs a shutdown or reboot of the Pi.
+# Forwarding shutdown to VLC (port 54322) will just shutdown the player.
 
-from socket import socket, gethostbyname, gethostname, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
+from socket import socket, gethostbyname, gethostname, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, SO_KEEPALIVE
 from socketserver import StreamRequestHandler, TCPServer
 from functools import partial
 from subprocess import run
@@ -14,7 +13,7 @@ VLC_PORT = 54322
 print(f'vlc ip: {VLC_HOST}\n')
 
 vlc_cmds = [b'shutdown\r\n', b'playlist\r\n', b'play\r\n', b'frame\r\n', 'goto \r\n']
-rpi_cmds = [b'pi_restart\n', b'pi_shutdown\n', b'pi_reboot\n']
+rpi_cmds = [b'pi_restart_vlc\n', b'pi_shutdown\n', b'pi_reboot\n']
 
 class Connection:
     def __init__(self, addr_prt, timeout=2, family=AF_INET, transport=SOCK_STREAM):
@@ -57,7 +56,7 @@ class IncomingHandler(StreamRequestHandler):
 
             elif line in rpi_cmds:
                 match line:
-                    case b'restart\n':
+                    case b'pi_restart_vlc\n':
                         restart_vlc()
                     case b'pi_shutdown\n':
                         shutdown_PI()
