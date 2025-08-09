@@ -42,59 +42,59 @@ class Connection:
 
 
 class IncomingHandler(StreamRequestHandler):
+    rpi_commands_map = {
+        b'pi_restart_vlc\n': 'pi_restart_vlc',
+        b'pi_shutdown\n': 'pi_shutdown',
+        b'pi_reboot\n': 'pi_reboot',
+    }
+
     def handle(self):
         print(f'Got inbound connection from {self.client_address}')
 
         for line in self.rfile:
             print(f'received message {line}')
-
             if line.endswith(b'\r\n'):
                 send_cmd(line)
-
-            elif line in rpi_cmds:
-                match line:
-                    case b'pi_restart_vlc\n':
-                        restart_vlc()
-                    case b'pi_shutdown\n':
-                        shutdown_PI()
-                    case b'pi_reboot\n':
-                        reboot_PI()
             else:
-                 continue
+                rpi_command = self.rpi_commands_map.get(line)
+                if rpi_command:
+                    cmd = getattr(self, rpi_command)
+                    cmd()
+                else:
+                    continue
+
+    def pi_restart_vlc(self):
+        print(f'CALLED RESTART IN THE CLASS')
+        run(['systemctl', '--user', 'restart', 'vlc-loader.service'])
+
+    def pi_shutdown(self):
+        run(['sudo', 'shutdown', '-h', 'now'])
+
+    def pi_reboot(self):
+        run(['sudo', 'shutdown', '-r', 'now'])
 
 
-def send_cmd(command):
-    conn = Connection((VLC_HOST, VLC_PORT))
-    try:
-        with conn as s:
-            if not s:
-                raise ConnectionError
-            else:
-                reply=b''.join(iter(partial(s.recv, 16), b'\n'))
+    def send_cmd(self, command):
+        conn = Connection((VLC_HOST, VLC_PORT))
+        try:
+            with conn as s:
+                reply = b''.join(iter(partial(s.recv, 1), b'\n'))
                 print(f'connected:\n{reply}')
 
                 if reply.startswith(b'VLC'):
                     print(f'----- VLC is running -----')
-                    reply= b''.join(iter(partial(s.recv, 1), b'>'))
+                    reply = b''.join(iter(partial(s.recv, 1), b'>'))
                     print(f'{reply}')
                     s.sendall(command)
-                    reply = b''.join(iter(partial(s.recv,1), b'>'))
+                    reply = b''.join(iter(partial(s.recv, 1), b'>'))
                     print(f'VLC replied:\n{reply.decode("ascii")}')
-    except (socket.timeout, ConnectionRefusedError) as e:
-        print(f"Couldn't connect to VLC: {e}")
-    except OSError as e:
-        print(f'Unexpected error occurred {e}')
 
-
-def restart_vlc():
-    run(['systemctl', '--user', 'restart', 'vlc-loader.service'])
-
-def shutdown_PI():
-    run(['sudo', 'shutdown', '-h', 'now'])
-
-def reboot_PI():
-    run(['sudo', 'shutdown', '-r', 'now'])
-
+        except (ConnectionRefusedError,
+     ConnectionError,
+     TimeoutError) as e:
+            print(f"Couldn't connect to VLC: {e}")
+        except Exception as e:
+            print(f'Unexpected error occurred {e}')
 
 if __name__ == '__main__':
 
