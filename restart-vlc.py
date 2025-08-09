@@ -28,10 +28,7 @@ class Connection:
         self.sock.settimeout(self.timeout)
         self.sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
 
-        try:
-            self.sock.connect(self.address)
-        except ConnectionError as err:
-            print(f'Socket was created but error connecting -  {err}')
+        self.sock.connect(self.address)
 
         return self.sock
 
@@ -68,20 +65,25 @@ class IncomingHandler(StreamRequestHandler):
 
 def send_cmd(command):
     conn = Connection((VLC_HOST, VLC_PORT))
-    with conn as s:
-        if not s:
-            raise ConnectionError
-        else:
-            reply=b''.join(iter(partial(s.recv, 16), b'\n'))
-            print(f'connected:\n{reply}')
+    try:
+        with conn as s:
+            if not s:
+                raise ConnectionError
+            else:
+                reply=b''.join(iter(partial(s.recv, 16), b'\n'))
+                print(f'connected:\n{reply}')
 
-            if reply.startswith(b'VLC'):
-                print(f'----- VLC is running -----')
-                reply= b''.join(iter(partial(s.recv, 1), b'>'))
-                print(f'{reply}')
-                s.sendall(command)
-                reply = b''.join(iter(partial(s.recv,1), b'>'))
-                print(f'VLC replied:\n{reply.decode("ascii")}')
+                if reply.startswith(b'VLC'):
+                    print(f'----- VLC is running -----')
+                    reply= b''.join(iter(partial(s.recv, 1), b'>'))
+                    print(f'{reply}')
+                    s.sendall(command)
+                    reply = b''.join(iter(partial(s.recv,1), b'>'))
+                    print(f'VLC replied:\n{reply.decode("ascii")}')
+    except (socket.timeout, ConnectionRefusedError) as e:
+        print(f"Couldn't connect to VLC: {e}")
+    except OSError as e:
+        print(f'Unexpected error occurred {e}')
 
 
 def restart_vlc():
