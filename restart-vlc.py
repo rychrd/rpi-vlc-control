@@ -11,7 +11,6 @@ VLC_HOST = gethostbyname(gethostname())
 VLC_PORT = 54322
 
 print(f'vlc ip: {VLC_HOST}\n')
-rpi_cmds = [b'pi_restart_vlc\n', b'pi_shutdown\n', b'pi_reboot\n']
 
 class Connection:
     def __init__(self, addr_prt, timeout=2, family=AF_INET, transport=SOCK_STREAM):
@@ -39,7 +38,6 @@ class Connection:
             return True
         self.sock.close()
         return None
-
 
 class IncomingHandler(StreamRequestHandler):
     rpi_commands_map = {
