@@ -11,8 +11,6 @@ VLC_HOST = gethostbyname(gethostname())
 VLC_PORT = 54322
 
 print(f'vlc ip: {VLC_HOST}\n')
-
-vlc_cmds = [b'shutdown\r\n', b'playlist\r\n', b'play\r\n', b'frame\r\n', 'goto \r\n']
 rpi_cmds = [b'pi_restart_vlc\n', b'pi_shutdown\n', b'pi_reboot\n']
 
 class Connection:
