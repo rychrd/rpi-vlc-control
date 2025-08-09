@@ -54,7 +54,7 @@ class IncomingHandler(StreamRequestHandler):
         for line in self.rfile:
             print(f'received message {line}')
             if line.endswith(b'\r\n'):
-                send_cmd(line)
+                self.send_cmd(line)
             else:
                 rpi_command = self.rpi_commands_map.get(line)
                 if rpi_command:
@@ -72,7 +72,6 @@ class IncomingHandler(StreamRequestHandler):
 
     def pi_reboot(self):
         run(['sudo', 'shutdown', '-r', 'now'])
-
 
     def send_cmd(self, command):
         conn = Connection((VLC_HOST, VLC_PORT))
