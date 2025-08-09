@@ -52,7 +52,7 @@ class IncomingHandler(StreamRequestHandler):
         for line in self.rfile:
             print(f'received message {line}')
             if line.endswith(b'\r\n'):
-                self.send_cmd(line)
+                self.forward_to_vlc(line)
             else:
                 rpi_command = self.rpi_commands_map.get(line)
                 if rpi_command:
@@ -62,8 +62,8 @@ class IncomingHandler(StreamRequestHandler):
                     continue
 
     def pi_restart_vlc(self):
-        print(f'CALLED RESTART IN THE CLASS')
-        run(['systemctl', '--user', 'restart', 'vlc-loader.service'])
+        print(f'CALLED VLC RESTART IN THE CLASS')
+        #run(['systemctl', '--user', 'restart', 'vlc-loader.service'])
 
     def pi_shutdown(self):
         run(['sudo', 'shutdown', '-h', 'now'])
@@ -71,7 +71,7 @@ class IncomingHandler(StreamRequestHandler):
     def pi_reboot(self):
         run(['sudo', 'shutdown', '-r', 'now'])
 
-    def send_cmd(self, command):
+    def forward_to_vlc(self, command):
         conn = Connection((VLC_HOST, VLC_PORT))
         try:
             with conn as s:
