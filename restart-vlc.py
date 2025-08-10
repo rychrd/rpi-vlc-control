@@ -6,6 +6,7 @@ from socket import socket, gethostbyname, gethostname, AF_INET, SOCK_STREAM, SOL
 from socketserver import StreamRequestHandler, TCPServer, BaseRequestHandler, UDPServer
 from functools import partial
 from subprocess import run
+import threading
 
 VLC_HOST = gethostbyname(gethostname())
 VLC_PORT = 54322
@@ -107,6 +108,27 @@ class UdpMessageHandler(BaseRequestHandler):
         message_handler = CommandDispatcher()
         message_handler.process_command(message)
 
+def start_tcp_server(address):
+    """Wrap the start of the server here so it's still possible to use a context manager and exceptions"""
+    try:
+        with TCPServer(address, TcpMessageHandler) as tcp_server:
+            tcp_server.allow_reuse_address = True
+            print(f'TCP Server listening on {address}')
+            tcp_server.serve_forever()
+    except Exception as e:
+        print(f'TCP thread crashed: {e}:')
+    finally:
+        print(f'Closed TCP thread')
+
+def start_udp_server(address):
+    try:
+        with UDPServer(address, UdpMessageHandler) as udp_server:
+            udp_server.serve_forever()
+    except Exception as e:
+        print(f'UDP thread crashed: {e}:')
+    finally:
+        print(f'Closed UDP thread')
+
 if __name__ == '__main__':
 
     tcp_serv = TCPServer(('0.0.0.0', 55550), TcpMessageHandler)
@@ -114,8 +136,6 @@ if __name__ == '__main__':
     print(f'TCP server created')
     udp_server = UDPServer(('0.0.0.0', 55551), UdpMessageHandler)
     print(f'UDP server created')
-    with udp_server:
-        udp_server.serve_forever()
-    with tcp_serv:
-        tcp_serv.serve_forever()
+
+
 
