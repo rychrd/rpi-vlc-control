@@ -12,6 +12,7 @@ VLC_PORT = 54322
 
 print(f'vlc ip: {VLC_HOST}\n')
 
+
 class Connection:
     def __init__(self, addr_prt, timeout=2, family=AF_INET, transport=SOCK_STREAM):
         self.address = addr_prt
@@ -32,12 +33,13 @@ class Connection:
         return self.sock
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if isinstance(exc_val, OSError ) :
+        if isinstance(exc_val, OSError):
             print(f'Exception handled in exit: {exc_type} {exc_val}')
             self.sock.close()
             return True
         self.sock.close()
         return None
+
 
 class IncomingHandler(StreamRequestHandler):
     rpi_commands_map = {
@@ -87,17 +89,16 @@ class IncomingHandler(StreamRequestHandler):
                     print(f'VLC replied:\n{reply.decode("ascii")}')
 
         except (ConnectionRefusedError,
-     ConnectionError,
-     TimeoutError) as e:
+                ConnectionError,
+                TimeoutError) as e:
             print(f"Couldn't connect to VLC: {e}")
         except Exception as e:
             print(f'Unexpected error occurred {e}')
 
+
 if __name__ == '__main__':
-
-    serv = TCPServer(('0.0.0.0', 55550), IncomingHandler)
-    serv.allow_reuse_address = True
+    tcp_serv = TCPServer(('0.0.0.0', 55550), IncomingHandler)
+    tcp_serv.allow_reuse_address = True
     print(f'TCP server created')
-
-    with serv:
-            serv.serve_forever()
+    with tcp_serv:
+        tcp_serv.serve_forever()
