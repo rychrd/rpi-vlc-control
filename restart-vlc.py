@@ -3,7 +3,7 @@
 # Forwarding shutdown to VLC (port 54322) will just shut down the player.
 
 from socket import socket, gethostbyname, gethostname, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
-from socketserver import StreamRequestHandler, TCPServer
+from socketserver import StreamRequestHandler, TCPServer, BaseRequestHandler, UDPServer
 from functools import partial
 from subprocess import run
 
@@ -40,32 +40,26 @@ class Connection:
         self.sock.close()
         return None
 
+class CommandDispatcher:
+    def __init__(self):
+        self.rpi_commands_map = {
+            b'pi_restart_vlc\n': 'pi_restart_vlc',
+            b'pi_shutdown\n': 'pi_shutdown',
+            b'pi_reboot\n': 'pi_reboot',
+        }
 
-class IncomingHandler(StreamRequestHandler):
-    rpi_commands_map = {
-        b'pi_restart_vlc\n': 'pi_restart_vlc',
-        b'pi_shutdown\n': 'pi_shutdown',
-        b'pi_reboot\n': 'pi_reboot',
-    }
-
-    def handle(self):
-        print(f'Got inbound connection from {self.client_address}')
-
-        for line in self.rfile:
-            print(f'received message {line}')
-            if line.endswith(b'\r\n'):
-                self.forward_to_vlc(line)
-            else:
-                rpi_command = self.rpi_commands_map.get(line)
-                if rpi_command:
-                    cmd = getattr(self, rpi_command)
-                    cmd()
-                else:
-                    continue
+    def process_command(self, data):
+        if data.endswith(b'\r\n'):
+            self.forward_to_vlc(data)
+        else:
+            rpi_command = self.rpi_commands_map.get(data)
+            if rpi_command:
+                cmd = getattr(self, rpi_command)
+                cmd()
 
     def pi_restart_vlc(self):
         print(f'CALLED VLC RESTART IN THE CLASS')
-        #run(['systemctl', '--user', 'restart', 'vlc-loader.service'])
+        # run(['systemctl', '--user', 'restart', 'vlc-loader.service'])
 
     def pi_shutdown(self):
         run(['sudo', 'shutdown', '-h', 'now'])
@@ -96,9 +90,31 @@ class IncomingHandler(StreamRequestHandler):
             print(f'Unexpected error occurred {e}')
 
 
+class TcpMessageHandler(StreamRequestHandler):
+    def handle(self):
+        print(f'Got inbound connection from {self.client_address}')
+        message_handler = CommandDispatcher()
+
+        for line in self.rfile:
+            print(f'received message {line}')
+            message_handler.process_command(line)
+
+class UdpMessageHandler(BaseRequestHandler):
+    def handle(self):
+        message = self.request[0]
+        sender = self.client_address
+        print(f'Got UDP datagram {message} from {sender}')
+        message_handler = CommandDispatcher()
+        message_handler.process_command(message)
+
 if __name__ == '__main__':
-    tcp_serv = TCPServer(('0.0.0.0', 55550), IncomingHandler)
+
+    tcp_serv = TCPServer(('0.0.0.0', 55550), TcpMessageHandler)
     tcp_serv.allow_reuse_address = True
+    udp_server = UDPServer(('0.0.0.0', 55551), UdpMessageHandler)
     print(f'TCP server created')
+    with udp_server:
+        udp_server.serve_forever()
     with tcp_serv:
         tcp_serv.serve_forever()
+
