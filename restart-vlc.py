@@ -111,8 +111,9 @@ if __name__ == '__main__':
 
     tcp_serv = TCPServer(('0.0.0.0', 55550), TcpMessageHandler)
     tcp_serv.allow_reuse_address = True
-    udp_server = UDPServer(('0.0.0.0', 55551), UdpMessageHandler)
     print(f'TCP server created')
+    udp_server = UDPServer(('0.0.0.0', 55551), UdpMessageHandler)
+    print(f'UDP server created')
     with udp_server:
         udp_server.serve_forever()
     with tcp_serv:
