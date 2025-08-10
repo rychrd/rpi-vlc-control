@@ -6,7 +6,7 @@ from socket import socket, gethostbyname, gethostname, AF_INET, SOCK_STREAM, SOL
 from socketserver import StreamRequestHandler, TCPServer, BaseRequestHandler, UDPServer
 from functools import partial
 from subprocess import run
-import threading
+import concurrent.futures as cf
 
 VLC_HOST = gethostbyname(gethostname())
 VLC_PORT = 54322
@@ -60,7 +60,7 @@ class CommandDispatcher:
 
     def pi_restart_vlc(self):
         print(f'CALLED VLC RESTART IN THE CLASS')
-        # run(['systemctl', '--user', 'restart', 'vlc-loader.service'])
+        run(['systemctl', '--user', 'restart', 'vlc-loader.service'])
 
     def pi_shutdown(self):
         run(['sudo', 'shutdown', '-h', 'now'])
@@ -95,7 +95,6 @@ class TcpMessageHandler(StreamRequestHandler):
     def handle(self):
         print(f'Got inbound connection from {self.client_address}')
         message_handler = CommandDispatcher()
-
         for line in self.rfile:
             print(f'received message {line}')
             message_handler.process_command(line)
@@ -109,7 +108,8 @@ class UdpMessageHandler(BaseRequestHandler):
         message_handler.process_command(message)
 
 def start_tcp_server(address):
-    """Wrap the start of the server here so it's still possible to use a context manager and exceptions"""
+    """Wrap the start of the server here so it's still possible
+        to use a context manager and exceptions"""
     try:
         with TCPServer(address, TcpMessageHandler) as tcp_server:
             tcp_server.allow_reuse_address = True
@@ -123,6 +123,7 @@ def start_tcp_server(address):
 def start_udp_server(address):
     try:
         with UDPServer(address, UdpMessageHandler) as udp_server:
+            print(f'UDP Server listening on {address}')
             udp_server.serve_forever()
     except Exception as e:
         print(f'UDP thread crashed: {e}:')
@@ -130,12 +131,16 @@ def start_udp_server(address):
         print(f'Closed UDP thread')
 
 if __name__ == '__main__':
+    tcp_addr = ('0.0.0.0', 55550)
+    udp_addr = ('0.0.0.0', 55551)
 
-    tcp_serv = TCPServer(('0.0.0.0', 55550), TcpMessageHandler)
-    tcp_serv.allow_reuse_address = True
-    print(f'TCP server created')
-    udp_server = UDPServer(('0.0.0.0', 55551), UdpMessageHandler)
-    print(f'UDP server created')
-
-
+    with cf.ThreadPoolExecutor(max_workers=2) as executor:
+        tcp_listen = executor.submit(start_tcp_server, tcp_addr)
+        udp_listen = executor.submit(start_udp_server, udp_addr)
+        try:
+            tcp_listen.result()
+            udp_listen.result()
+        except Exception as e:
+            print(f'Exception raised in thread: {e}')
+    print(f'Main program exiting')
 
